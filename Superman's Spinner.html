@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>SUPERMAN SPINNER LOL</title>
+  <style>
+    body { margin:0; display:flex; flex-direction:column; align-items:center; justify-content:center; min-height:100vh; font-family:sans-serif; background:#eef2f7 }
+    h1 { margin-bottom:20px }
+    #controls { text-align:center; margin-bottom:20px }
+    .slot { display:inline-block; margin:2px; padding:2px; border:1px solid #ccc; border-radius:4px }
+    .slot input { width:100px; font-size:14px }
+    .slot button { margin-left:4px; font-size:12px }
+    canvas { border:6px solid #c62828; border-radius:50%; box-shadow:0 0 15px rgba(0,0,0,0.2); margin-bottom:10px }
+    button { margin:5px; padding:8px 16px; font-size:16px; cursor:pointer; border-radius:5px; border:none }
+    #spinBtn { background:#1976d2; color:white }
+    #spinBtn:disabled { background:#999 }
+    #addBtn { background:#4caf50; color:white }
+    #updateBtn { background:#ff9800; color:white }
+    #result { margin-top:15px; font-size:18px; color:#333 }
+  </style>
+</head>
+<body>
+  <h1>SUPERMAN SPINNER LOL</h1>
+  <div id="controls">
+    <div id="inputs">
+      <div class="slot"><input type="text" value="I"><button class="del-slot">×</button></div>
+      <div class="slot"><input type="text" value="㤅"><button class="del-slot">×</button></div>
+      <div class="slot"><input type="text" value="Superman"><button class="del-slot">×</button></div>
+      <div class="slot"><input type="text" value="10"><button class="del-slot">×</button></div>
+      <div class="slot"><input type="text" value="Tikioutpost"><button class="del-slot">×</button></div>
+      <div class="slot"><input type="text" value="Mom"><button class="del-slot">×</button></div>
+    </div>
+    <button id="addBtn">Add Slot</button>
+    <button id="updateBtn">Update Wheel</button>
+  </div>
+
+  <canvas id="canvas" width="400" height="400"></canvas>
+  <button id="spinBtn">SPIN</button>
+  <div id="result"></div>
+
+  <script>
+    const canvas = document.getElementById("canvas"), ctx = canvas.getContext("2d");
+    const center = { x:200, y:200 }, radius = 180;
+    const spinBtn = document.getElementById("spinBtn"), addBtn = document.getElementById("addBtn"), updateBtn = document.getElementById("updateBtn");
+    const inputsDiv = document.getElementById("inputs"), resultBox = document.getElementById("result");
+
+    let sectors = Array.from(inputsDiv.querySelectorAll("input")).map(i => i.value);
+    const colors = ["#e53935","#8e24aa","#3949ab","#00897b","#fbc02d","#fb8c00","#7b1fa2","#0288d1","#5d4037","#c2185b"];
+    let angleOffset = 0, isSpinning = false;
+
+    function drawWheel() {
+      ctx.clearRect(0,0,400,400);
+      const segAngle = 2 * Math.PI / sectors.length;
+      sectors.forEach((label, i) => {
+        const start = angleOffset + i * segAngle;
+        ctx.beginPath(); ctx.moveTo(center.x, center.y);
+        ctx.arc(center.x, center.y, radius, start, start + segAngle);
+        ctx.fillStyle = colors[i % colors.length]; ctx.fill();
+        ctx.save(); ctx.translate(center.x, center.y);
+        ctx.rotate(start + segAngle / 2);
+        ctx.textAlign="right"; ctx.fillStyle="#fff"; ctx.font="18px sans-serif";
+        ctx.fillText(label, radius-10, 10);
+        ctx.restore();
+      });
+      ctx.beginPath();
+      ctx.moveTo(center.x, center.y - radius - 10);
+      ctx.lineTo(center.x - 10, center.y - radius + 20);
+      ctx.lineTo(center.x + 10, center.y - radius + 20);
+      ctx.closePath();
+      ctx.fillStyle="#c62828"; ctx.fill();
+    }
+
+    function easeOutCubic(t) { return (--t)*t*t + 1 }
+
+    function spin() {
+      if(isSpinning || sectors.length === 0) return;
+      isSpinning = true; spinBtn.disabled = true;
+      const total = 360 * 5 + Math.random() * 360;
+      const start = performance.now(), dur = 4000;
+      (function animate(now) {
+        const elapsed = now - start, progress = Math.min(elapsed / dur, 1);
+        angleOffset = (total * easeOutCubic(progress)) * Math.PI / 180;
+        drawWheel();
+        if(progress < 1) requestAnimationFrame(animate);
+        else { isSpinning = false; spinBtn.disabled = false; determineResult(total % 360); }
+      })(performance.now());
+    }
+
+    function determineResult(finalAngleDeg) {
+      const pointerAngle = 270; // Pointer at top of circle
+      const normalized = (pointerAngle - finalAngleDeg + 360) % 360;
+      const segDeg = 360 / sectors.length;
+      const idx = Math.floor(normalized / segDeg) % sectors.length;
+      const prize = sectors[idx];
+      const deleteIt = confirm(`You got: "${prize}". Delete?`);
+      if(deleteIt) {
+        sectors.splice(idx, 1);
+        rebuildInputs();
+        resultBox.textContent = `Removed: ${prize}`;
+      } else {
+        resultBox.textContent = `Kept: ${prize}`;
+      }
+      drawWheel();
+      setTimeout(() => resultBox.textContent = "", 2000);
+    }
+
+    function rebuildInputs() {
+      inputsDiv.innerHTML = "";
+      sectors.forEach(label => {
+        const slot = document.createElement("div"); slot.className = "slot";
+        slot.innerHTML = `<input type="text" value="${label}"><button class="del-slot">×</button>`;
+        inputsDiv.appendChild(slot);
+      });
+    }
+
+    addBtn.addEventListener("click", () => {
+      const slot = document.createElement("div"); slot.className = "slot";
+      slot.innerHTML = `<input type="text" value=""><button class="del-slot">×</button>`;
+      inputsDiv.appendChild(slot);
+    });
+
+    updateBtn.addEventListener("click", () => {
+      sectors = Array.from(inputsDiv.querySelectorAll("input")).map(i => i.value.trim()).filter(v => v);
+      drawWheel();
+    });
+
+    inputsDiv.addEventListener("click", e => {
+      if(e.target.classList.contains("del-slot")) e.target.closest(".slot").remove();
+    });
+
+    spinBtn.addEventListener("click", spin);
+    drawWheel();
+  </script>
+</body>
+</html>
